@@ -131,7 +131,7 @@ func newVantageCollector() *vantageCollector {
 			[]string{"skill_id", "transaction_id"}, nil,
 		),
 
-		baseURL:      getEnv("VANTAGE_BASE_URL", "https://vantage-us.abbyy.com"),
+		baseURL:      getEnv("VANTAGE_BASE_URL"),
 		clientID:     os.Getenv("VANTAGE_CLIENT_ID"),
 		clientSecret: os.Getenv("VANTAGE_CLIENT_SECRET"),
 	}
