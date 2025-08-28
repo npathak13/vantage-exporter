@@ -36,6 +36,40 @@ type StageDto struct {
 	Name string `json:"name"`
 }
 
+// DocumentBusinessRulesErrorDto represents business rule errors
+type DocumentBusinessRulesErrorDto struct {
+	Message string `json:"message"`
+	Type    string `json:"type"`
+}
+
+// ResultFile represents output files from processing
+type ResultFile struct {
+	FileID   string `json:"fileId"`
+	FileName string `json:"fileName"`
+	Type     string `json:"type"`
+}
+
+// SourceFile represents input files
+type SourceFile struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// DocumentDetail represents detailed transaction document information
+type DocumentDetail struct {
+	ID                  string                           `json:"id"`
+	ResultFiles         []ResultFile                     `json:"resultFiles"`
+	BusinessRulesErrors []DocumentBusinessRulesErrorDto  `json:"businessRulesErrors"`
+}
+
+// TransactionDetail represents detailed individual transaction response
+type TransactionDetail struct {
+	ID          string           `json:"id"`
+	Status      string           `json:"status"`
+	Documents   []DocumentDetail `json:"documents"`
+	SourceFiles []SourceFile     `json:"sourceFiles"`
+}
+
 // Transaction represents a Vantage transaction with actual API fields
 type Transaction struct {
 	ID                        string      `json:"transactionId"`
@@ -60,6 +94,23 @@ type TransactionResponse struct {
 	TotalItemCount int           `json:"totalItemCount"`
 }
 
+// TransactionMetrics represents detailed metrics for a skill
+type TransactionMetrics struct {
+	SkillID              string             `json:"skill_id"`
+	SkillName            string             `json:"skill_name"`
+	TotalTransactions    int                `json:"total_transactions"`
+	CompletedSuccess     int                `json:"completed_success"`
+	CompletedFailed      int                `json:"completed_failed"`
+	ActiveProcessing     int                `json:"active_processing"`
+	ActiveManualReview   int                `json:"active_manual_review"`
+	AveragePages         float64            `json:"avg_pages_per_transaction"`
+	AverageDocuments     float64            `json:"avg_documents_per_transaction"`
+	BusinessRulesErrors  int                `json:"business_rules_errors_total"`
+	StageBreakdown       map[string]int     `json:"stage_breakdown"`
+	StatusBreakdown      map[string]int     `json:"status_breakdown"`
+	FileTypeBreakdown    map[string]int     `json:"file_type_breakdown"`
+}
+
 // TokenResponse represents OAuth2 token response
 type TokenResponse struct {
 	AccessToken string `json:"access_token"`
@@ -67,27 +118,30 @@ type TokenResponse struct {
 
 // VantageCollector implements prometheus.Collector
 type vantageCollector struct {
-	// Existing metrics
 	skillMetric                *prometheus.Desc
 	transactionMetric          *prometheus.Desc
 	completedTransactionMetric *prometheus.Desc
-
-	// New enhanced metrics
-	transactionCreatedMetric      *prometheus.Desc
-	transactionPageCountMetric    *prometheus.Desc
-	skillVersionMetric            *prometheus.Desc
-	transactionFileCountMetric    *prometheus.Desc
-	transactionDocumentCountMetric *prometheus.Desc
+	transactionCreatedMetric        *prometheus.Desc
+	transactionPageCountMetric      *prometheus.Desc
+	skillVersionMetric              *prometheus.Desc
+	transactionFileCountMetric      *prometheus.Desc
+	transactionDocumentCountMetric  *prometheus.Desc
+	businessRulesErrorsMetric       *prometheus.Desc
+	resultFileTypesMetric           *prometheus.Desc
+	processingSuccessMetric         *prometheus.Desc
 
 	baseURL      string
 	clientID     string
 	clientSecret string
+
+	// Cache for skills to avoid API calls on every request
+	cachedSkills []Skill
+	skillsCacheTime time.Time
 }
 
 // newVantageCollector creates a new collector with all metrics
 func newVantageCollector() *vantageCollector {
 	return &vantageCollector{
-		// Existing metrics
 		skillMetric: prometheus.NewDesc(
 			"vantage_skill_info",
 			"Vantage skill information",
@@ -104,7 +158,6 @@ func newVantageCollector() *vantageCollector {
 			[]string{"skill_id", "status"}, nil,
 		),
 
-		// New enhanced metrics
 		transactionCreatedMetric: prometheus.NewDesc(
 			"vantage_transaction_created_timestamp",
 			"Transaction creation timestamp",
@@ -130,26 +183,42 @@ func newVantageCollector() *vantageCollector {
 			"Number of extracted documents per transaction",
 			[]string{"skill_id", "transaction_id"}, nil,
 		),
+		businessRulesErrorsMetric: prometheus.NewDesc(
+			"vantage_business_rules_errors_total",
+			"Business rule validation errors per transaction",
+			[]string{"skill_id", "transaction_id", "error_type"}, nil,
+		),
+		resultFileTypesMetric: prometheus.NewDesc(
+			"vantage_result_file_types_total",
+			"Types of result files generated per transaction",
+			[]string{"skill_id", "transaction_id", "file_type"}, nil,
+		),
+		processingSuccessMetric: prometheus.NewDesc(
+			"vantage_processing_success",
+			"Transaction processing success indicator",
+			[]string{"skill_id", "transaction_id", "status"}, nil,
+		),
 
-		baseURL:      getEnv("VANTAGE_BASE_URL"),
-		clientID:     os.Getenv("VANTAGE_CLIENT_ID"),
-		clientSecret: os.Getenv("VANTAGE_CLIENT_SECRET"),
+		baseURL:      getEnv("VANTAGE_BASE_URL", "https://vantage-us.abbyy.com"),
+		clientID:     getEnv("VANTAGE_CLIENT_ID", ""),
+		clientSecret: getEnv("VANTAGE_CLIENT_SECRET", ""),
 	}
 }
 
 // Describe implements prometheus.Collector
 func (c *vantageCollector) Describe(ch chan<- *prometheus.Desc) {
-	// Existing metrics
+	// metrics
 	ch <- c.skillMetric
 	ch <- c.transactionMetric
 	ch <- c.completedTransactionMetric
-
-	// New enhanced metrics
 	ch <- c.transactionCreatedMetric
 	ch <- c.transactionPageCountMetric
 	ch <- c.skillVersionMetric
 	ch <- c.transactionFileCountMetric
 	ch <- c.transactionDocumentCountMetric
+	ch <- c.businessRulesErrorsMetric
+	ch <- c.resultFileTypesMetric
+	ch <- c.processingSuccessMetric
 }
 
 // Collect implements prometheus.Collector
@@ -169,7 +238,7 @@ func (c *vantageCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	// Enhanced active transactions collection
+	// active transactions collection
 	activeTransactions, err := c.getActiveTransactions()
 	if err != nil {
 		log.Printf("Error getting active transactions: %v", err)
@@ -187,7 +256,7 @@ func (c *vantageCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	// Enhanced completed transactions collection
+	// completed transactions collection
 	completedTransactions, err := c.getCompletedTransactions()
 	if err != nil {
 		log.Printf("Error getting completed transactions: %v", err)
@@ -203,75 +272,6 @@ func (c *vantageCollector) Collect(ch chan<- prometheus.Metric) {
 				statusCounts[skillID] = make(map[string]int)
 			}
 			statusCounts[skillID][status]++
-
-			// Debug: Check timestamp data
-			log.Printf("Transaction %s: CreateTime=%s, CompletedTime=%s", tx.ID, tx.CreateTimeUtc, tx.CompletedUtc)
-
-			// Transaction creation timestamp - FIX THE PARSING
-			if tx.CreateTimeUtc != "" {
-				// API returns format like "2025-08-27T17:43:44.52" without timezone
-				var createdTime time.Time
-				var err error
-
-				// Try multiple timestamp formats
-				formats := []string{
-					time.RFC3339,                    // Standard: 2025-08-27T17:43:44Z
-					"2006-01-02T15:04:05.999",      // Without timezone: 2025-08-27T17:43:44.52
-					"2006-01-02T15:04:05.999999",   // With microseconds
-					"2006-01-02T15:04:05",          // Without fractional seconds
-				}
-
-				for _, format := range formats {
-					createdTime, err = time.Parse(format, tx.CreateTimeUtc)
-					if err == nil {
-						break
-					}
-				}
-
-				if err == nil {
-					ch <- prometheus.MustNewConstMetric(
-						c.transactionCreatedMetric,
-						prometheus.GaugeValue,
-						float64(createdTime.Unix()),
-						tx.SkillID, tx.ID,
-					)
-					log.Printf("✅ Successfully parsed timestamp for %s: %s -> %d", tx.ID, tx.CreateTimeUtc, createdTime.Unix())
-				} else {
-					log.Printf("❌ Failed to parse timestamp for %s: %s (error: %v)", tx.ID, tx.CreateTimeUtc, err)
-				}
-			}
-
-			// Document and page counts from actual API response
-			ch <- prometheus.MustNewConstMetric(
-				c.transactionDocumentCountMetric,
-				prometheus.GaugeValue,
-				float64(tx.DocumentCount),
-				tx.SkillID, tx.ID,
-			)
-
-			// Page count metric
-			ch <- prometheus.MustNewConstMetric(
-				c.transactionPageCountMetric,
-				prometheus.GaugeValue,
-				float64(tx.PageCount),
-				tx.SkillID, tx.ID,
-			)
-
-			// File count from fileParameters (count unique SourceFileName entries)
-			fileCount := 0
-			seenFiles := make(map[string]bool)
-			for _, param := range tx.FileParameters {
-				if param.Key == "SourceFileName" && !seenFiles[param.Value] {
-					seenFiles[param.Value] = true
-					fileCount++
-				}
-			}
-			ch <- prometheus.MustNewConstMetric(
-				c.transactionFileCountMetric,
-				prometheus.GaugeValue,
-				float64(fileCount),
-				tx.SkillID, tx.ID,
-			)
 
 			// Skill version tracking (avoid duplicates)
 			skillVersionKey := fmt.Sprintf("%s-%d", tx.SkillID, tx.SkillVersion)
@@ -369,7 +369,7 @@ func (c *vantageCollector) getSkills() ([]Skill, error) {
 	return skills, nil
 }
 
-// getActiveTransactions fetches active transactions with enhanced data
+// getActiveTransactions fetches active transactions with data
 func (c *vantageCollector) getActiveTransactions() ([]Transaction, error) {
 	token, err := c.getToken()
 	if err != nil {
@@ -418,7 +418,7 @@ func (c *vantageCollector) getActiveTransactions() ([]Transaction, error) {
 	return response.Items, nil
 }
 
-// getCompletedTransactions fetches completed transactions with enhanced data
+// getCompletedTransactions fetches completed transactions with  data
 func (c *vantageCollector) getCompletedTransactions() ([]Transaction, error) {
 	token, err := c.getToken()
 	if err != nil {
@@ -467,6 +467,220 @@ func (c *vantageCollector) getCompletedTransactions() ([]Transaction, error) {
 	return response.Items, nil
 }
 
+// getTransactionDetail fetches detailed information for a single transaction
+func (c *vantageCollector) getTransactionDetail(transactionID string) (*TransactionDetail, error) {
+	token, err := c.getToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token: %w", err)
+	}
+
+	req, err := http.NewRequest("GET", c.baseURL+"/api/publicapi/v1/transactions/"+transactionID, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req = req.WithContext(ctx)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var detail TransactionDetail
+	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
+		return nil, fmt.Errorf("failed to parse transaction detail JSON: %w", err)
+	}
+
+	return &detail, nil
+}
+
+// handleTransactionDetails handles the multi-skill transaction details endpoint
+func (c *vantageCollector) handleTransactionDetails(w http.ResponseWriter, r *http.Request) {
+	// Parse skills parameter
+	skillsParam := r.URL.Query().Get("skills")
+	if skillsParam == "" {
+		http.Error(w, "skills parameter required (e.g., ?skills=skill1,skill2,skill3)", http.StatusBadRequest)
+		return
+	}
+
+	// Parse comma-separated skill IDs (handle Grafana format with braces)
+	skillsParam = strings.Trim(skillsParam, "{}")
+	skillIds := strings.Split(skillsParam, ",")
+
+	// Clean up skill IDs
+	for i := range skillIds {
+		skillIds[i] = strings.TrimSpace(skillIds[i])
+	}
+
+	if len(skillIds) == 0 || (len(skillIds) == 1 && skillIds[0] == "") {
+		http.Error(w, "no valid skill IDs provided", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Processing transaction details for %d skills: %v", len(skillIds), skillIds)
+
+	// Get fresh data using your existing methods
+	skills, err := c.getSkills()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to get skills: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	activeTransactions, err := c.getActiveTransactions()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to get active transactions: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	completedTransactions, err := c.getCompletedTransactions()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to get completed transactions: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Create skill name lookup
+	skillNames := make(map[string]string)
+	for _, skill := range skills {
+		skillNames[skill.ID] = skill.Name
+	}
+
+	// Process each requested skill
+	var results []TransactionMetrics
+
+	for _, skillId := range skillIds {
+		if skillId == "" {
+			continue
+		}
+
+		skillName := skillNames[skillId]
+		if skillName == "" {
+			skillName = skillId // fallback
+		}
+
+		metrics := TransactionMetrics{
+			SkillID:           skillId,
+			SkillName:         skillName,
+			StageBreakdown:    make(map[string]int),
+			StatusBreakdown:   make(map[string]int),
+			FileTypeBreakdown: make(map[string]int),
+		}
+
+		// Process active transactions for this skill
+		var totalPages, totalDocs int
+		for _, tx := range activeTransactions {
+			if tx.SkillID != skillId {
+				continue
+			}
+
+			metrics.TotalTransactions++
+			totalPages += tx.PageCount
+			totalDocs += tx.DocumentCount
+
+			// Stage breakdown
+			if tx.Stage.Name != "" {
+				metrics.StageBreakdown[tx.Stage.Name]++
+			}
+			if tx.Stage.Type != "" {
+				metrics.StageBreakdown[tx.Stage.Type]++
+			}
+
+			// Count manual review vs processing
+			if tx.ManualReviewOperatorName != "" || tx.ManualReviewOperatorEmail != "" {
+				metrics.ActiveManualReview++
+			} else {
+				metrics.ActiveProcessing++
+			}
+		}
+
+		// Process completed transactions for this skill
+		for _, tx := range completedTransactions {
+			if tx.SkillID != skillId {
+				continue
+			}
+
+			metrics.TotalTransactions++
+			totalPages += tx.PageCount
+			totalDocs += tx.DocumentCount
+
+			// Status breakdown
+			metrics.StatusBreakdown[tx.Status]++
+
+			if tx.Status == "Finished Successfully" {
+				metrics.CompletedSuccess++
+			} else if tx.Status == "Failed" {
+				metrics.CompletedFailed++
+			}
+		}
+
+		// Calculate averages
+		if metrics.TotalTransactions > 0 {
+			metrics.AveragePages = float64(totalPages) / float64(metrics.TotalTransactions)
+			metrics.AverageDocuments = float64(totalDocs) / float64(metrics.TotalTransactions)
+		}
+
+		results = append(results, metrics)
+		log.Printf("Processed skill %s (%s): %d total transactions", skillId, skillName, metrics.TotalTransactions)
+	}
+
+	// Return JSON response
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(results); err != nil {
+		http.Error(w, fmt.Sprintf("failed to encode response: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Successfully returned metrics for %d skills", len(results))
+}
+
+// handleSkillsList returns list of skills for Grafana template variables
+func (c *vantageCollector) handleSkillsList(w http.ResponseWriter, r *http.Request) {
+	// Use cached skills if available and recent (less than 5 minutes old)
+	if time.Since(c.skillsCacheTime) < 5*time.Minute && len(c.cachedSkills) > 0 {
+		log.Printf("Using cached skills (%d skills)", len(c.cachedSkills))
+	} else {
+		// Refresh cache
+		skills, err := c.getSkills()
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to get skills: %v", err), http.StatusInternalServerError)
+			return
+		}
+		c.cachedSkills = skills
+		c.skillsCacheTime = time.Now()
+		log.Printf("Refreshed skills cache (%d skills)", len(skills))
+	}
+
+	type SkillOption struct {
+		Value string `json:"value"`
+		Text  string `json:"text"`
+	}
+
+	var options []SkillOption
+	for _, skill := range c.cachedSkills {
+		options = append(options, SkillOption{
+			Value: skill.ID,
+			Text:  fmt.Sprintf("%s (%s)", skill.Name, skill.ID),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(options); err != nil {
+		http.Error(w, fmt.Sprintf("failed to encode response: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Returned %d skills for template variables", len(options))
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -485,7 +699,16 @@ func main() {
 	collector := newVantageCollector()
 	prometheus.MustRegister(collector)
 
+	// metrics endpoints
 	http.Handle("/metrics", promhttp.Handler())
-	log.Println("Enhanced Vantage exporter running on :8084/metrics")
-	log.Fatal(http.ListenAndServe(":8084", nil))
+	http.HandleFunc("/transaction-details", collector.handleTransactionDetails)
+	http.HandleFunc("/skills", collector.handleSkillsList)
+
+	log.Println("Vantage exporter running on:8091")
+	log.Println("Endpoints:")
+	log.Println("  /metrics - Prometheus metrics")
+	log.Println("  /transaction-details?skills=skill1,skill2,skill3 - Multi-skill transaction details")
+	log.Println("  /skills - Skills list for Grafana template variables")
+
+	log.Fatal(http.ListenAndServe(":8091", nil))
 }
