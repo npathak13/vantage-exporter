@@ -359,7 +359,7 @@ func (c *vantageCollector) getSkills() ([]Skill, error) {
 	return skills, nil
 }
 
-// getActiveTransactions fetches active transactions with enhanced data
+// getActiveTransactions fetches active transactions from Vantage API
 func (c *vantageCollector) getActiveTransactions() ([]Transaction, error) {
 	token, err := c.getToken()
 	if err != nil {
