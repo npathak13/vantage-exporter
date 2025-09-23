@@ -34,19 +34,30 @@ cp .env.example .env
 docker-compose up -d
 ```
 
-Access services:
+**Access services:**
 - **Grafana**: http://localhost:3000 (admin/admin)
 - **Prometheus**: http://localhost:9090
 - **Exporter metrics**: http://localhost:8080/metrics
 
-To stop: `docker-compose down`
+**Stop services:**
+```bash
+docker-compose down
+```
+
+**Develop dashboards:**
+1. Create dashboards in Grafana (http://localhost:3000)
+2. Export JSON (Dashboard settings → JSON Model)
+3. Save to `helm/dashboards/your-dashboard.json`
+4. Update `helm/templates/grafana/dashboard-configmap.yaml` to include new dashboard
+5. Dashboards auto-load on restart
 
 ### Option 2: Kubernetes with Helm
 
-Enable Grafana and Prometheus for local development:
+For testing the Helm chart in a local cluster (kind/minikube):
 
+**Initial setup:**
 ```bash
-# Update dependencies first
+# Update chart dependencies
 helm dependency update ./helm
 
 # Install with dev values
@@ -56,16 +67,56 @@ helm install vantage-exporter ./helm \
   --set vantage.clientSecret="your-secret"
 ```
 
-The `values-dev.yaml` file:
+**Access services:**
+- **Grafana**: http://localhost:30300 (admin/admin)
+- **Prometheus**: http://localhost:30090
+- **Exporter metrics**: `kubectl port-forward svc/vantage-exporter-vantage-exporter 8080:8080`
+
+**Develop dashboards:**
+1. Port-forward Grafana: `kubectl port-forward svc/vantage-exporter-grafana 3000:80`
+2. Access at http://localhost:3000 (admin/admin)
+3. Create/edit dashboards
+4. Export JSON and save to `helm/dashboards/`
+5. Update ConfigMap if adding new dashboards
+6. Upgrade release: `helm upgrade vantage-exporter ./helm -f helm/values-dev.yaml`
+
+**The `values-dev.yaml` configuration:**
 - Enables Grafana with pre-configured Prometheus datasource
 - Enables Prometheus with optimized settings for development
 - Disables persistence (no PVs required)
 - Exposes services via NodePort for easy access
+- Enables dashboard sidecar for auto-discovery
 
-Access services:
-- **Grafana**: http://localhost:30300 (admin/admin)
-- **Prometheus**: http://localhost:30090
-- **Exporter metrics**: `kubectl port-forward svc/vantage-exporter-vantage-exporter 8080:8080`
+## Dashboard Development
+
+To create or modify Grafana dashboards:
+
+1. **Start Docker Compose environment:**
+   ```bash
+   cd docker-dev/
+   docker-compose up -d
+   ```
+
+2. **Access Grafana** at http://localhost:3000 (admin/admin)
+   - Prometheus datasource is pre-configured
+   - Build your dashboards using vantage metrics
+
+3. **Export dashboard JSON:**
+   - Dashboard settings → JSON Model → Copy
+   - Or: Share → Export → Save to file
+
+4. **Save to version control:**
+   ```bash
+   # Save the exported JSON
+   cat > helm/dashboards/my-dashboard.json
+   # Paste JSON and Ctrl+D
+   ```
+
+5. **Update ConfigMap** if adding new dashboards:
+   - Edit `helm/templates/grafana/dashboard-configmap.yaml`
+   - Add new dashboard entry under `data:`
+
+The dashboards will auto-load in both Docker Compose and Helm deployments.
 
 ## Configuration
 
