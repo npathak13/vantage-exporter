@@ -1,0 +1,129 @@
+# -- Number of replicas for the vantage-exporter deployment
+replicaCount: 1
+
+image:
+  # -- Container image repository
+  repository: vantage-exporter
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+  # -- Image tag (overrides the image tag whose default is the chart appVersion)
+  tag: ""
+
+# -- Secrets with credentials to pull images from a private registry
+imagePullSecrets: []
+
+# -- Override the name of the chart
+nameOverride: ""
+
+# -- Override the full name of the release
+fullnameOverride: ""
+
+vantage:
+  # -- Vantage API base URL
+  baseUrl: "https://vantage-us.abbyy.com"
+  # -- Vantage API client ID
+  clientId: ""
+  # -- Vantage API client secret
+  clientSecret: ""
+  # -- Name of existing secret to use for credentials (instead of creating one)
+  existingSecret: ""
+  existingSecretKeys:
+    # -- Key in existing secret containing the client ID
+    clientId: "client-id"
+    # -- Key in existing secret containing the client secret
+    clientSecret: "client-secret"
+
+# -- Port on which the exporter exposes metrics
+metricsPort: 8080
+
+serviceAccount:
+  # -- Specifies whether a service account should be created
+  create: true
+  # -- Annotations to add to the service account
+  annotations: {}
+  # -- The name of the service account to use (if not set and create is true, a name is generated)
+  name: ""
+
+# -- Annotations to add to the pod
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+# -- Security context for the pod
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# -- Security context for the container
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+
+service:
+  # -- Service type
+  type: ClusterIP
+  # -- Service port
+  port: 8080
+  # -- Annotations to add to the service
+  annotations: {}
+
+serviceMonitor:
+  # -- Create a ServiceMonitor for Prometheus Operator
+  enabled: false
+  # -- Scrape interval
+  interval: 30s
+  # -- Scrape timeout
+  scrapeTimeout: 10s
+  # -- Additional labels for ServiceMonitor
+  labels: {}
+
+# -- Resource limits and requests
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 64Mi
+
+# -- Liveness probe configuration
+livenessProbe:
+  httpGet:
+    path: /metrics
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 10
+
+# -- Readiness probe configuration
+readinessProbe:
+  httpGet:
+    path: /metrics
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+
+# -- Node selector for pod assignment
+nodeSelector: {}
+
+# -- Tolerations for pod assignment
+tolerations: []
+
+# -- Affinity for pod assignment
+affinity: {}
+
+# Grafana dependency configuration
+grafana:
+  # -- Enable Grafana installation
+  enabled: false
+
+# Prometheus dependency configuration
+prometheus:
+  # -- Enable Prometheus installation
+  enabled: false

@@ -1,0 +1,65 @@
+# Development values - enables Grafana and Prometheus
+
+# Enable dependencies for local development
+grafana:
+  enabled: true
+
+  # -- Admin password for Grafana (must be set explicitly; do not use default!)
+  adminPassword: ""
+
+  # -- Disable persistence for dev
+  persistence:
+    enabled: false
+
+  # -- Pre-configure Prometheus as a datasource
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://{{ .Release.Name }}-prometheus-server
+        access: proxy
+        isDefault: true
+        editable: true
+
+  # -- Service configuration for easy access
+  service:
+    type: NodePort
+    nodePort: 30300
+
+prometheus:
+  enabled: true
+
+  # -- Disable alertmanager for dev
+  alertmanager:
+    enabled: false
+
+  # -- Disable kube-state-metrics for dev
+  kube-state-metrics:
+    enabled: false
+
+  # -- Disable node-exporter for dev
+  prometheus-node-exporter:
+    enabled: false
+
+  # -- Disable pushgateway for dev
+  prometheus-pushgateway:
+    enabled: false
+
+  server:
+    # -- Disable persistence for dev
+    persistentVolume:
+      enabled: false
+
+    # -- Short retention for dev
+    retention: "2h"
+
+    # -- Service configuration for easy access
+    service:
+      type: NodePort
+      nodePort: 30090
+
+# Enable ServiceMonitor for automatic discovery
+serviceMonitor:
+  enabled: true

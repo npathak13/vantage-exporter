@@ -1,0 +1,72 @@
+{{ template "chart.header" . }}
+
+{{ template "chart.description" . }}
+
+{{ template "chart.versionBadge" . }}{{ template "chart.typeBadge" . }}{{ template "chart.appVersionBadge" . }}
+
+## Installing the Chart
+
+Install with credentials:
+
+```bash
+helm install vantage-exporter ./helm \
+  --set vantage.clientId="your-client-id" \
+  --set vantage.clientSecret="your-secret"
+```
+
+Install with existing secret:
+
+```bash
+helm install vantage-exporter ./helm \
+  --set vantage.existingSecret="vantage-credentials"
+```
+
+## Development Setup
+
+Enable Grafana and Prometheus for local development:
+
+```bash
+# Update dependencies first
+helm dependency update ./helm
+
+# Install with dev values
+helm install vantage-exporter ./helm \
+  -f helm/values-dev.yaml \
+  --set vantage.clientId="your-client-id" \
+  --set vantage.clientSecret="your-secret"
+```
+
+The `values-dev.yaml` file:
+- Enables Grafana with pre-configured Prometheus datasource
+- Enables Prometheus with optimized settings for development
+- Disables persistence (no PVs required)
+- Exposes services via NodePort for easy access
+
+Access services:
+- **Grafana**: http://localhost:30300 (admin/admin)
+- **Prometheus**: http://localhost:30090
+- **Exporter metrics**: `kubectl port-forward svc/vantage-exporter-vantage-exporter 8080:8080`
+
+## Configuration
+
+{{ template "chart.valuesTable" . }}
+
+## Regenerating Documentation
+
+This README is generated from the Helm chart values and templates. To regenerate:
+
+```bash
+# Install helm-docs if not already installed
+go install github.com/norwoodj/helm-docs/cmd/helm-docs@latest
+
+# Regenerate the README
+cd helm/
+helm-docs --output-file=../README.md
+```
+
+The documentation is generated from:
+- `helm/Chart.yaml` - Chart metadata
+- `helm/values.yaml` - Configuration values and comments
+- `helm/README.md.gotmpl` - README template
+
+{{ template "helm-docs.versionFooter" . }}

@@ -1,0 +1,33 @@
+apiVersion: v2
+name: vantage-exporter
+description: Prometheus exporter for ABBYY Vantage metrics
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+keywords:
+  - prometheus
+  - exporter
+  - monitoring
+  - vantage
+  - abbyy
+
+home: https://github.com/npathak13/vantage-exporter
+sources:
+  - https://github.com/npathak13/vantage-exporter
+
+maintainers:
+  - name: Niraj Pathak
+    email: npp5048@gmail.com
+
+# Dependencies (disabled by default, enabled in values-dev.yaml)
+dependencies:
+  - name: grafana
+    version: "~10.0.0"
+    repository: "https://grafana.github.io/helm-charts"
+    condition: grafana.enabled
+
+  - name: prometheus
+    version: "~27.39.0"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: prometheus.enabled
