@@ -4,12 +4,17 @@
 grafana:
   enabled: true
 
-  # -- Admin password for Grafana (must be set explicitly; do not use default!)
-  adminPassword: ""
+  # -- Admin password for Grafana (change in production!)
+  adminPassword: "admin"
 
   # -- Disable persistence for dev
   persistence:
     enabled: false
+
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
 
   # -- Pre-configure Prometheus as a datasource
   datasources:
