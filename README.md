@@ -23,6 +23,26 @@ helm install vantage-exporter ./helm \
 
 ## Development Setup
 
+### Option 1: Docker Compose (Simplest)
+
+For quick local testing without Kubernetes:
+
+```bash
+cd docker-dev/
+cp .env.example .env
+# Edit .env with your credentials
+docker-compose up -d
+```
+
+Access services:
+- **Grafana**: http://localhost:3000 (admin/admin)
+- **Prometheus**: http://localhost:9090
+- **Exporter metrics**: http://localhost:8080/metrics
+
+To stop: `docker-compose down`
+
+### Option 2: Kubernetes with Helm
+
 Enable Grafana and Prometheus for local development:
 
 ```bash

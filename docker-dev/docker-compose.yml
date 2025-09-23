@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  vantage-exporter:
+    build: ..
+    ports:
+      - "8080:8080"
+    environment:
+      - VANTAGE_BASE_URL=${VANTAGE_BASE_URL:-https://vantage-us.abbyy.com}
+      - VANTAGE_CLIENT_ID=${VANTAGE_CLIENT_ID}
+      - VANTAGE_CLIENT_SECRET=${VANTAGE_CLIENT_SECRET}
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
