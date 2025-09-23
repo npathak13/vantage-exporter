@@ -4,8 +4,8 @@
 grafana:
   enabled: true
 
-  # -- Admin password for Grafana (change in production!)
-  adminPassword: "admin"
+  # -- Admin password for Grafana (must be set explicitly; do not use default!)
+  adminPassword: ""
 
   # -- Disable persistence for dev
   persistence:
