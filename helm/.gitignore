@@ -1,2 +1,2 @@
-helm/charts/
-helm/*.tgz
+charts/
+*.tgz
