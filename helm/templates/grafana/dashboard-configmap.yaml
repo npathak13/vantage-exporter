@@ -8,5 +8,5 @@ metadata:
     grafana_dashboard: "1"
 data:
   vantage-overview.json: |-
-{{ .Files.Get "dashboards/vantage-overview.json" | indent 4 }}
+{{ .Files.Get "dashboards/compare-skils.json" | indent 4 }}
 {{- end }}
