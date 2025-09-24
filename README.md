@@ -176,3 +176,6 @@ The documentation is generated from:
 - `helm/values.yaml` - Configuration values and comments
 - `helm/README.md.gotmpl` - README template
 
+## Disclaimer
+
+This Prometheus exporter was created by Niraj Pathak as an individual contributor. While I am employed by ABBYY, this tool was developed independently and is not officially supported by ABBYY.
