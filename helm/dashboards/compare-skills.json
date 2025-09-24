@@ -249,8 +249,8 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": "All",
-          "value": "$__all"
+          "text": "Air Waybill",
+          "value": "Air Waybill"
         },
         "definition": "label_values(vantage_skill_info, skill_name)",
         "description": "skills",
@@ -275,8 +275,8 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": "All",
-          "value": "$__all"
+          "text": "Basic Contract",
+          "value": "Basic Contract"
         },
         "definition": "label_values(vantage_skill_info, skill_name)",
         "description": "skills",
@@ -301,12 +301,12 @@
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Skill Comparison",
   "uid": "adf5t7b",
-  "version": 6
+  "version": 9
 }
