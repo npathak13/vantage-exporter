@@ -179,6 +179,3 @@ The documentation is generated from:
 ## Disclaimer
 
 This Prometheus exporter was created by Niraj Pathak as an individual contributor. While I am employed by ABBYY, this tool was developed independently and is not officially supported by ABBYY.
-
-Use at your own risk.
-
