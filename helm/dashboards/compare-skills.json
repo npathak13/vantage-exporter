@@ -15,6 +15,7 @@
       }
     ]
   },
+  "description": "Dashboard for comparing 2 skills against each other",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -134,6 +135,19 @@
         }
       ],
       "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 4,
+      "panels": [],
+      "title": "Skills Compare-inator",
+      "type": "row"
     }
   ],
   "preload": false,
@@ -150,7 +164,27 @@
         "description": "skills",
         "includeAll": true,
         "multi": true,
-        "name": "skill_name",
+        "name": "skill_a",
+        "options": [],
+        "query": {
+          "qryType": 5,
+          "query": "label_values(vantage_skill_info, skill_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "definition": "label_values(vantage_skill_info, skill_name)",
+        "description": "skills",
+        "includeAll": true,
+        "multi": true,
+        "name": "skill_b",
         "options": [],
         "query": {
           "qryType": 5,
@@ -169,7 +203,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Vantage Overview",
+  "title": "Skill Comparison",
   "uid": "adf5t7b",
-  "version": 1
+  "version": 2
 }
