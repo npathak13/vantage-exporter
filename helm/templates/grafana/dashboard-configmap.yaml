@@ -9,4 +9,6 @@ metadata:
 data:
   vantage-overview.json: |-
 {{ .Files.Get "dashboards/vantage-reference-dash.json" | indent 4 }}
+  compare-skills.json: |-
+{{ .Files.Get "dashboards/compare-skills.json" | indent 4 }}
 {{- end }}
