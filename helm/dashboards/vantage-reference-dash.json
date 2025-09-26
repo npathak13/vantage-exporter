@@ -431,6 +431,13 @@
       "targets": [
         {
           "columns": [],
+          "computed_columns": [
+            {
+              "selector": "",
+              "text": "",
+              "type": "string"
+            }
+          ],
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
             "uid": "cez56rylp3pc0d"
